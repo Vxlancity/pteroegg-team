@@ -3,12 +3,16 @@ const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const app = express();
 const PORT = Number(process.env.SERVER_PORT || process.env.PORT || 3000);
 const HOST = process.env.SERVER_IP || '0.0.0.0';
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'panel.json');
+const SOURCE_REPOSITORY = String(process.env.SOURCE_REPOSITORY || '');
+const SOURCE_BRANCH = String(process.env.SOURCE_BRANCH || 'main');
+const APP_VERSION = '1.1.0';
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -64,10 +68,85 @@ function auth(req, res, next) {
   req.user = user;
   next();
 }
+function admin(req, res, next) {
+  if (!['owner', 'admin'].includes(req.user.role)) return res.status(403).json({ error: 'Keine Berechtigung' });
+  next();
+}
 function cleanUser(u) { return { id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt }; }
 
-app.get('/api/health', (req, res) => res.json({ ok: true, name: 'VxTeamPanel', version: '1.0.0' }));
+function gitArgs(token, args) {
+  return token ? ['-c', `http.extraheader=Authorization: Bearer ${token}`, ...args] : args;
+}
+function runGit(token, args, cwd = __dirname) {
+  return spawnSync('git', gitArgs(token, args), { cwd, encoding: 'utf8', timeout: 120000, maxBuffer: 2 * 1024 * 1024 });
+}
+function getRemoteCommit() {
+  if (!SOURCE_REPOSITORY) throw new Error('SOURCE_REPOSITORY ist nicht konfiguriert.');
+  const result = runGit(process.env.GITHUB_TOKEN || '', ['ls-remote', SOURCE_REPOSITORY, `refs/heads/${SOURCE_BRANCH}`]);
+  if (result.status !== 0) throw new Error(String(result.stderr || 'Repository konnte nicht erreicht werden.').trim());
+  const hash = String(result.stdout || '').trim().split(/\s+/)[0];
+  if (!/^[a-f0-9]{40}$/.test(hash)) throw new Error('Kein gültiger Commit für den Update-Branch gefunden.');
+  return hash;
+}
+function readInstalledCommit() {
+  const file = path.join(__dirname, '.vxteam-commit');
+  try { return fs.readFileSync(file, 'utf8').trim(); } catch { return ''; }
+}
+function writeInstalledCommit(commit) {
+  fs.writeFileSync(path.join(__dirname, '.vxteam-commit'), `${commit}\n`);
+}
+function updateFromRepository() {
+  if (!SOURCE_REPOSITORY) throw new Error('SOURCE_REPOSITORY ist nicht konfiguriert.');
+  const token = process.env.GITHUB_TOKEN || '';
+  const remoteCommit = getRemoteCommit();
+  const tempDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'vxteampanel-update-'));
+  try {
+    const clone = runGit(token, ['clone', '--depth', '1', '--branch', SOURCE_BRANCH, SOURCE_REPOSITORY, tempDir], __dirname);
+    if (clone.status !== 0) throw new Error(String(clone.stderr || 'Update-Repository konnte nicht geklont werden.').trim());
+
+    const entries = fs.readdirSync(tempDir);
+    for (const entry of entries) {
+      if (entry === '.git' || entry === 'data' || entry === 'node_modules') continue;
+      const source = path.join(tempDir, entry);
+      const target = path.join(__dirname, entry);
+      fs.rmSync(target, { recursive: true, force: true });
+      fs.cpSync(source, target, { recursive: true });
+    }
+    writeInstalledCommit(remoteCommit);
+
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const install = spawnSync(npm, ['install', '--omit=dev'], { cwd: __dirname, encoding: 'utf8', timeout: 180000, maxBuffer: 4 * 1024 * 1024 });
+    if (install.status !== 0) throw new Error(String(install.stderr || 'npm install fehlgeschlagen.').trim());
+
+    return remoteCommit;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+app.get('/api/health', (req, res) => res.json({ ok: true, name: 'VxTeamPanel', version: APP_VERSION }));
 app.get('/api/me', auth, (req, res) => res.json({ user: cleanUser(req.user), settings: db.settings }));
+
+app.get('/api/update', auth, admin, (req, res) => {
+  try {
+    const remote = getRemoteCommit();
+    const installed = readInstalledCommit();
+    res.json({ currentVersion: APP_VERSION, installedCommit: installed || null, remoteCommit: remote, updateAvailable: Boolean(installed && installed !== remote), repository: SOURCE_REPOSITORY, branch: SOURCE_BRANCH });
+  } catch (e) {
+    res.status(500).json({ error: `Update-Prüfung fehlgeschlagen: ${e.message}` });
+  }
+});
+app.post('/api/update', auth, admin, (req, res) => {
+  try {
+    const installed = readInstalledCommit();
+    const remote = getRemoteCommit();
+    if (installed && installed === remote) return res.json({ ok: true, updated: false, message: 'Das Panel ist bereits aktuell.', commit: remote, restartRequired: false });
+    const commit = updateFromRepository();
+    res.json({ ok: true, updated: true, message: 'Update installiert. Bitte den Pterodactyl-Server neu starten, damit der neue Backend-Code geladen wird.', commit, restartRequired: true });
+  } catch (e) {
+    res.status(500).json({ error: `Update fehlgeschlagen: ${e.message}` });
+  }
+});
 
 app.post('/api/auth/register', (req, res) => {
   const name = String(req.body.name || '').trim();
