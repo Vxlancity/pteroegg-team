@@ -1,0 +1,90 @@
+{
+  "_comment": "VxTeamPanel - Pterodactyl Egg",
+  "meta": { "version": "PTDL_v2", "update_url": null },
+  "exported_at": "2026-09-14T16:10:00+02:00",
+  "name": "VxTeamPanel",
+  "author": "Vxlancity",
+  "description": "Self-hosted team management panel for Pterodactyl. Includes dashboard, members, tasks, meetings, applications and local JSON persistence.",
+  "features": null,
+  "docker_images": {
+    "Node.js 22": "ghcr.io/ptero-eggs/yolks:nodejs_22",
+    "Node.js 24": "ghcr.io/ptero-eggs/yolks:nodejs_24"
+  },
+  "file_denylist": [],
+  "startup": "node server.js",
+  "config": {
+    "files": "{}",
+    "startup": "{\n  \"done\": \"[VxTeamPanel] listening on\"\n}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\nset -e\napt update\napt install -y curl git ca-certificates tar gzip\nmkdir -p /mnt/server\ncd /mnt/server\n\necho '[VxTeamPanel] Installing panel source...'\nif [ -n \"${GITHUB_TOKEN}\" ]; then\n  rm -rf .git panel-source\n  git -c http.extraheader=\"Authorization: Bearer ${GITHUB_TOKEN}\" clone --depth 1 \"${SOURCE_REPOSITORY}\" panel-source\n  cp -a panel-source/. .\n  rm -rf panel-source .git\nelse\n  echo '[VxTeamPanel] No GITHUB_TOKEN supplied. The repository must be public or files must already exist in /mnt/server.'\n  if [ ! -f package.json ]; then\n    echo '[VxTeamPanel] ERROR: package.json not found.'\n    exit 1\n  fi\nfi\n\nif [ ! -f package.json ]; then\n  echo '[VxTeamPanel] ERROR: package.json not found after source install.'\n  exit 1\nfi\n\necho '[VxTeamPanel] Installing npm dependencies...'\nnpm install --omit=dev\nmkdir -p data\n\necho '[VxTeamPanel] Installation complete.'\nexit 0\n",
+      "container": "ghcr.io/pterodactyl/installers:debian",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Source Repository",
+      "description": "Git repository containing the VxTeamPanel source.",
+      "env_variable": "SOURCE_REPOSITORY",
+      "default_value": "https://github.com/Vxlancity/pteroegg-team.git",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "GitHub Token",
+      "description": "Optional GitHub token used only during installation when SOURCE_REPOSITORY is private. Keep this value private and enter it directly in Pterodactyl.",
+      "env_variable": "GITHUB_TOKEN",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Team Name",
+      "description": "Name shown in the panel on first startup.",
+      "env_variable": "TEAM_NAME",
+      "default_value": "VxTeam",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:80",
+      "field_type": "text"
+    },
+    {
+      "name": "Admin Email",
+      "description": "Initial administrator email. Used only when the panel creates its first data file.",
+      "env_variable": "ADMIN_EMAIL",
+      "default_value": "admin@localhost",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:160",
+      "field_type": "text"
+    },
+    {
+      "name": "Admin Password",
+      "description": "Initial administrator password. Set a strong password before first start.",
+      "env_variable": "ADMIN_PASSWORD",
+      "default_value": "ChangeMe123!",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:8|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Session Secret",
+      "description": "Secret used to sign login sessions. Use a long random value.",
+      "env_variable": "SESSION_SECRET",
+      "default_value": "change-this-session-secret",
+      "user_viewable": false,
+      "user_editable": true,
+      "rules": "required|string|min:32|max:512",
+      "field_type": "text"
+    }
+  ]
+}
