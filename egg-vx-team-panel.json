@@ -1,34 +1,36 @@
 {
-  "_comment": "VxTeamPanel - Pterodactyl Egg",
-  "meta": { "version": "PTDL_v2", "update_url": null },
-  "exported_at": "2026-09-14T16:20:00+02:00",
+  "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-09-14T16:30:00+02:00",
   "name": "VxTeamPanel",
   "author": "Vxlancity",
   "description": "Self-hosted team management panel for Pterodactyl with dashboard, team management, tasks, meetings, applications, local persistence and repository-based updates.",
   "features": null,
   "docker_images": {
-    "Node.js 22": "ghcr.io/ptero-eggs/yolks:nodejs_22",
-    "Node.js 24": "ghcr.io/ptero-eggs/yolks:nodejs_24"
+    "Nodejs 22": "ghcr.io/ptero-eggs/yolks:nodejs_22"
   },
   "file_denylist": [],
   "startup": "node server.js",
   "config": {
     "files": "{}",
-    "startup": "{\n  \"done\": \"[VxTeamPanel] listening on\"\n}",
+    "startup": "{\r\n  \"done\": \"[VxTeamPanel] listening on\"\r\n}",
     "logs": "{}",
     "stop": "^C"
   },
   "scripts": {
     "installation": {
-      "script": "#!/bin/bash\nset -e\napt update\napt install -y curl git ca-certificates tar gzip\nmkdir -p /mnt/server\ncd /mnt/server\n\necho '[VxTeamPanel] Installing panel source...'\nif [ -n \"${GITHUB_TOKEN}\" ]; then\n  rm -rf .git panel-source\n  git -c http.extraheader=\"Authorization: Bearer ${GITHUB_TOKEN}\" clone --depth 1 --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\nelse\n  rm -rf .git panel-source\n  git clone --depth 1 --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\nfi\n\ncp -a panel-source/. .\nif [ -d panel-source/.git ]; then git -C panel-source rev-parse HEAD > .vxteam-commit; fi\nrm -rf panel-source .git\n\nif [ ! -f package.json ]; then\n  echo '[VxTeamPanel] ERROR: package.json not found after source install.'\n  exit 1\nfi\n\necho '[VxTeamPanel] Installing npm dependencies...'\nnpm install --omit=dev\nmkdir -p data\n\necho '[VxTeamPanel] Installation complete.'\nexit 0\n",
-      "container": "ghcr.io/pterodactyl/installers:debian",
+      "script": "#!/bin/bash\r\nset -e\r\n\napt update\r\napt install -y git ca-certificates\r\n\nmkdir -p /mnt/server\r\ncd /mnt/server\r\n\necho '[VxTeamPanel] Installing source...'\r\nrm -rf panel-source\r\n\nif [ -n \"${GITHUB_TOKEN}\" ]; then\r\n  git -c http.extraheader=\"Authorization: Bearer ${GITHUB_TOKEN}\" clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nelse\r\n  git clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nfi\r\n\nif [ ! -f panel-source/package.json ]; then\r\n  echo '[VxTeamPanel] ERROR: package.json not found in repository.'\r\n  exit 1\r\nfi\r\n\nCOMMIT=$(git -C panel-source rev-parse HEAD)\r\ncp -a panel-source/. /mnt/server/\r\nrm -rf /mnt/server/panel-source /mnt/server/.git\r\nprintf '%s\\n' \"${COMMIT}\" > /mnt/server/.vxteam-commit\r\n\n/usr/local/bin/npm install --omit=dev\r\nmkdir -p /mnt/server/data\r\necho '[VxTeamPanel] Installation complete.'\r\nexit 0",
+      "container": "node:22-bookworm-slim",
       "entrypoint": "bash"
     }
   },
   "variables": [
     {
       "name": "Source Repository",
-      "description": "Git repository containing the VxTeamPanel source. Once public, no token is required.",
+      "description": "Git repository containing the VxTeamPanel source.",
       "env_variable": "SOURCE_REPOSITORY",
       "default_value": "https://github.com/Vxlancity/pteroegg-team.git",
       "user_viewable": true,
@@ -43,12 +45,12 @@
       "default_value": "main",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|string|max:80",
+      "rules": "required|string",
       "field_type": "text"
     },
     {
       "name": "GitHub Token",
-      "description": "Optional GitHub token used during installation and in-panel updates when SOURCE_REPOSITORY is private. Never publish this value.",
+      "description": "Optional GitHub token for a private source repository. Leave empty once the repository is public.",
       "env_variable": "GITHUB_TOKEN",
       "default_value": "",
       "user_viewable": false,
@@ -58,7 +60,7 @@
     },
     {
       "name": "Team Name",
-      "description": "Name shown in the panel on first startup.",
+      "description": "Name shown when the panel creates its initial database.",
       "env_variable": "TEAM_NAME",
       "default_value": "VxTeam",
       "user_viewable": true,
@@ -68,7 +70,7 @@
     },
     {
       "name": "Admin Email",
-      "description": "Initial administrator email. Used only when the panel creates its first data file.",
+      "description": "Initial administrator email. Only used when data/panel.json does not exist yet.",
       "env_variable": "ADMIN_EMAIL",
       "default_value": "admin@localhost",
       "user_viewable": true,
@@ -78,7 +80,7 @@
     },
     {
       "name": "Admin Password",
-      "description": "Initial administrator password. Set a strong password before first start.",
+      "description": "Initial administrator password. Only used when data/panel.json does not exist yet.",
       "env_variable": "ADMIN_PASSWORD",
       "default_value": "ChangeMe123!",
       "user_viewable": false,
@@ -88,9 +90,9 @@
     },
     {
       "name": "Session Secret",
-      "description": "Secret used to sign login sessions. Use a long random value.",
+      "description": "Long random secret used to sign login sessions.",
       "env_variable": "SESSION_SECRET",
-      "default_value": "change-this-session-secret",
+      "default_value": "change-this-session-secret-please",
       "user_viewable": false,
       "user_editable": true,
       "rules": "required|string|min:32|max:512",
