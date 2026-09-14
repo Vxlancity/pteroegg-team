@@ -4,11 +4,11 @@
     "version": "PTDL_v2",
     "update_url": null
   },
-  "exported_at": "2026-09-14T16:30:00+02:00",
+  "exported_at": "2026-09-14T16:45:00+02:00",
   "name": "VxTeamPanel",
-  "author": "Vxlancity",
+  "author": "vxlancity@users.noreply.github.com",
   "description": "Self-hosted team management panel for Pterodactyl with dashboard, team management, tasks, meetings, applications, local persistence and repository-based updates.",
-  "features": null,
+  "features": [],
   "docker_images": {
     "Nodejs 22": "ghcr.io/ptero-eggs/yolks:nodejs_22"
   },
@@ -16,14 +16,14 @@
   "startup": "node server.js",
   "config": {
     "files": "{}",
-    "startup": "{\r\n  \"done\": \"[VxTeamPanel] listening on\"\r\n}",
+    "startup": "{\r\n  \"done\": [\r\n    \"[VxTeamPanel] listening on\"\r\n  ]\r\n}",
     "logs": "{}",
     "stop": "^C"
   },
   "scripts": {
     "installation": {
-      "script": "#!/bin/bash\r\nset -e\r\n\napt update\r\napt install -y git ca-certificates\r\n\nmkdir -p /mnt/server\r\ncd /mnt/server\r\n\necho '[VxTeamPanel] Installing source...'\r\nrm -rf panel-source\r\n\nif [ -n \"${GITHUB_TOKEN}\" ]; then\r\n  git -c http.extraheader=\"Authorization: Bearer ${GITHUB_TOKEN}\" clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nelse\r\n  git clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nfi\r\n\nif [ ! -f panel-source/package.json ]; then\r\n  echo '[VxTeamPanel] ERROR: package.json not found in repository.'\r\n  exit 1\r\nfi\r\n\nCOMMIT=$(git -C panel-source rev-parse HEAD)\r\ncp -a panel-source/. /mnt/server/\r\nrm -rf /mnt/server/panel-source /mnt/server/.git\r\nprintf '%s\\n' \"${COMMIT}\" > /mnt/server/.vxteam-commit\r\n\n/usr/local/bin/npm install --omit=dev\r\nmkdir -p /mnt/server/data\r\necho '[VxTeamPanel] Installation complete.'\r\nexit 0",
-      "container": "node:22-bookworm-slim",
+      "script": "#!/bin/bash\r\nset -e\r\n\r\napt update\r\napt install -y git ca-certificates\r\n\r\nmkdir -p /mnt/server\r\ncd /mnt/server\r\n\r\necho '[VxTeamPanel] Installing source...'\r\nrm -rf panel-source\r\n\r\nif [ -n \"${GITHUB_TOKEN}\" ]; then\r\n  git -c http.extraheader=\"Authorization: Bearer ${GITHUB_TOKEN}\" clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nelse\r\n  git clone --depth 1 --single-branch --branch \"${SOURCE_BRANCH}\" \"${SOURCE_REPOSITORY}\" panel-source\r\nfi\r\n\r\nif [ ! -f panel-source/package.json ]; then\r\n  echo '[VxTeamPanel] ERROR: package.json not found in repository.'\r\n  exit 1\r\nfi\r\n\r\nCOMMIT=$(git -C panel-source rev-parse HEAD)\r\ncp -a panel-source/. /mnt/server/\r\nrm -rf /mnt/server/panel-source /mnt/server/.git\r\nprintf '%s\\n' \"${COMMIT}\" > /mnt/server/.vxteam-commit\r\n\r\n/usr/local/bin/npm install --omit=dev\r\nmkdir -p /mnt/server/data\r\necho '[VxTeamPanel] Installation complete.'\r\nexit 0",
+      "container": "ghcr.io/ptero-eggs/installers:debian",
       "entrypoint": "bash"
     }
   },
