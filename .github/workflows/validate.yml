@@ -1,0 +1,20 @@
+name: Validate VxTeamPanel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --package-lock-only
+      - run: node --check server.js
+      - run: node -e "JSON.parse(require('fs').readFileSync('egg-vx-team-panel.json','utf8')); console.log('egg JSON valid')"
