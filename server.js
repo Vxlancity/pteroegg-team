@@ -149,5 +149,5 @@ app.put('/api/settings', auth, (req, res) => {
   save(db); res.json(db.settings);
 });
 
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.use((req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.listen(PORT, HOST, () => console.log(`[VxTeamPanel] listening on ${HOST}:${PORT}`));
