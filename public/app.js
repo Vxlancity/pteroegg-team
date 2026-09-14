@@ -9,7 +9,7 @@ async function api(url, options = {}) {
 }
 const esc = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
 const date = s => s ? new Date(s).toLocaleString('de-DE', { dateStyle:'medium', timeStyle:'short' }) : '—';
-const toast = msg => { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); };
+const toast = msg => { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500); };
 
 async function boot() {
   try { const me = await api('/api/me'); state.me = me.user; state.settings = me.settings; render(); }
@@ -22,12 +22,12 @@ function renderLogin() {
 }
 
 function shell(content) {
-  const nav = [['dashboard','Übersicht','⌂'],['members','Mitglieder','◉'],['tasks','Aufgaben','✓'],['meetings','Meetings','◷'],['applications','Bewerbungen','✦'],['settings','Einstellungen','⚙']];
+  const nav = [['dashboard','Übersicht','⌂'],['members','Mitglieder','◉'],['tasks','Aufgaben','✓'],['meetings','Meetings','◷'],['applications','Bewerbungen','✦'],['settings','Einstellungen','⚙'],...( ['owner','admin'].includes(state.me.role) ? [['updates','Updates','↻']] : [])];
   app.innerHTML = `<div class="layout"><aside><div class="brand"><span class="brand-mark">VX</span><div><b>${esc(state.settings?.teamName || 'VxTeam')}</b><small>TeamPanel</small></div></div><nav>${nav.map(([p,n,i])=>`<button class="nav ${state.page===p?'active':''}" data-page="${p}"><span>${i}</span>${n}</button>`).join('')}</nav><div class="side-bottom"><div class="user"><div class="avatar">${esc(state.me.name[0].toUpperCase())}</div><div><b>${esc(state.me.name)}</b><small>${esc(state.me.role)}</small></div></div><button id="logout" class="logout">Abmelden</button></div></aside><main class="main"><header><div><div class="eyebrow">TEAM WORKSPACE</div><h1>${esc(title())}</h1></div><div class="online"><i></i> Self-hosted</div></header>${content}</main></div>`;
   document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{state.page=b.dataset.page; render();});
   document.getElementById('logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST'}); state.me=null; renderLogin();};
 }
-function title(){ return ({dashboard:'Übersicht',members:'Mitglieder',tasks:'Aufgaben',meetings:'Meetings',applications:'Bewerbungen',settings:'Einstellungen'})[state.page]; }
+function title(){ return ({dashboard:'Übersicht',members:'Mitglieder',tasks:'Aufgaben',meetings:'Meetings',applications:'Bewerbungen',settings:'Einstellungen',updates:'Updates'})[state.page]; }
 function card(label,value,sub,icon){return `<div class="stat"><span class="stat-icon">${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`;}
 
 async function dashboard(){ const d=await api('/api/dashboard'); return `<section class="grid stats">${card('Mitglieder',d.members,'im Team','◉')}${card('Offene Aufgaben',d.tasks,'zu erledigen','✓')}${card('Meetings',d.meetings,'geplant','◷')}${card('Bewerbungen',d.applications,'offen','✦')}</section><section class="two"><div class="panel"><div class="panel-head"><div><h2>Letzte Ankündigungen</h2><p>Neuigkeiten für dein Team</p></div></div>${d.announcements.length?d.announcements.map(a=>`<article class="announcement"><b>${esc(a.title)}</b><p>${esc(a.text)}</p><small>${date(a.createdAt)}</small></article>`).join(''):'<div class="empty">Noch keine Ankündigungen vorhanden.</div>'}</div><div class="panel hero-panel"><span class="pill">SELF-HOSTED</span><h2>${esc(state.settings.teamName)}</h2><p>${esc(state.settings.description)}</p><div class="feature-list"><span>✓ Teamverwaltung</span><span>✓ Aufgaben & Meetings</span><span>✓ Bewerbungen</span><span>✓ Lokale Datenhaltung</span></div></div></section>`; }
@@ -42,9 +42,15 @@ async function applications(){ const items=await api('/api/applications'); retur
 
 async function settings(){ const s=await api('/api/settings'); return `<div class="panel narrow"><div class="panel-head"><div><h2>Team-Einstellungen</h2><p>Branding und Beschreibung des Teams.</p></div></div><form id="settings"><label>Teamname<input name="teamName" value="${esc(s.teamName)}" maxlength="80"></label><label>Beschreibung<textarea name="description" maxlength="240">${esc(s.description)}</textarea></label><button>Speichern</button></form><div class="notice">Daten werden lokal in <code>data/panel.json</code> gespeichert.</div></div>`; }
 
+async function updates(){
+  const u = await api('/api/update');
+  const available = u.updateAvailable;
+  return `<div class="panel narrow"><div class="panel-head"><div><h2>Panel-Updates</h2><p>Prüfe das Git-Repository auf neue Versionen.</p></div><span class="pill">${available?'UPDATE VERFÜGBAR':'AKTUELL'}</span></div><div class="notice"><b>Repository</b><br>${esc(u.repository)}<br><small>Branch: ${esc(u.branch)}</small></div><div class="update-info"><div><small>Installierter Commit</small><code>${esc(u.installedCommit || 'noch nicht gesetzt')}</code></div><div><small>Repository Commit</small><code>${esc(u.remoteCommit)}</code></div></div><button id="run-update" ${available?'':'disabled'}>${available?'Update installieren':'Kein Update verfügbar'}</button><p id="update-result" class="muted"></p></div>`;
+}
+
 async function render(){
   if(!state.me) return renderLogin();
-  try { let content=''; if(state.page==='dashboard') content=await dashboard(); else if(state.page==='members') content=await members(); else if(state.page==='tasks') content=await tasks(); else if(state.page==='meetings') content=await meetings(); else if(state.page==='applications') content=await applications(); else content=await settings(); shell(content); bind(); } catch(e){ toast(e.message); }
+  try { let content=''; if(state.page==='dashboard') content=await dashboard(); else if(state.page==='members') content=await members(); else if(state.page==='tasks') content=await tasks(); else if(state.page==='meetings') content=await meetings(); else if(state.page==='applications') content=await applications(); else if(state.page==='updates') content=await updates(); else content=await settings(); shell(content); bind(); } catch(e){ toast(e.message); }
 }
 function bind(){
   document.getElementById('add-task')?.addEventListener('click',async()=>{const title=prompt('Aufgabe'); if(title) {await api('/api/tasks',{method:'POST',body:JSON.stringify({title})}); render();}});
@@ -56,5 +62,6 @@ function bind(){
   document.getElementById('add-app')?.addEventListener('click',async()=>{const name=prompt('Name'); if(!name)return; const text=prompt('Bewerbungstext'); if(text){await api('/api/applications',{method:'POST',body:JSON.stringify({name,text})});render();}});
   document.querySelectorAll('.app-status').forEach(x=>x.onchange=async()=>{await api('/api/applications/'+x.dataset.id,{method:'PATCH',body:JSON.stringify({status:x.value})});toast('Status gespeichert');});
   document.getElementById('settings')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);state.settings=await api('/api/settings',{method:'PUT',body:JSON.stringify(Object.fromEntries(f))});toast('Gespeichert');render();});
+  document.getElementById('run-update')?.addEventListener('click',async()=>{const button=document.getElementById('run-update');const out=document.getElementById('update-result');button.disabled=true;button.textContent='Update wird installiert…';try{const r=await api('/api/update',{method:'POST'});out.textContent=r.message;if(r.updated)toast('Update installiert – Server-Neustart erforderlich');}catch(e){out.textContent=e.message;button.disabled=false;button.textContent='Update installieren';}});
 }
 boot();
